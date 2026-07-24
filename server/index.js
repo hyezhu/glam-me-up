@@ -131,6 +131,20 @@ app.post("/api/analyze", async (req, res) => {
   }
 });
 
+// Guarantee JSON (never HTML) for /api/* errors — e.g. body-parser's
+// PayloadTooLargeError, which Express would otherwise render as an HTML
+// error page and break the frontend's res.json() parsing.
+app.use("/api", (err, req, res, next) => {
+  if (!err) return next();
+  console.error(err);
+  const status = err.status || err.statusCode || 500;
+  const message =
+    status === 413
+      ? "Your photos are too large together. Try removing one or use fewer/smaller images."
+      : err.message || "Something went wrong on the server.";
+  res.status(status).json({ error: message });
+});
+
 // Serve the production build if it exists (npm run build && npm start)
 app.use(express.static(path.join(__dirname, "..", "dist")));
 app.get("*", (req, res, next) => {

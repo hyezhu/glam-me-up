@@ -15,6 +15,15 @@ export async function analyzeStyle(
     }),
   });
 
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      res.status === 413
+        ? "Your photos are too large together. Try removing one or use fewer/smaller images."
+        : `The styling server didn't respond as expected (status ${res.status}). Make sure the API server is running (npm run dev starts both the web and api processes).`
+    );
+  }
+
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.error || "Something went wrong while styling your look.");
