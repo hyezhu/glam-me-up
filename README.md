@@ -31,13 +31,19 @@ paid API keys and licensing this prototype doesn't have. Instead, the model is
 prompted to reason the way a real stylist synthesizes several established
 frameworks at once: seasonal color analysis, body-shape silhouette guides,
 event dress-code norms, face-shape/hairstyle pairing conventions, and makeup
-theory. See `server/index.js` for the exact system prompt.
+theory. See `shared/stylist.js` for the exact system prompt.
 
 ## Tech stack
 
 - **Frontend:** React + TypeScript + Vite + Tailwind CSS
-- **Backend:** a small Express server that proxies to the Claude API so your
-  key never reaches the browser
+- **Backend:** the analysis prompt/logic lives in `shared/stylist.js` and is
+  used by two interchangeable servers so your API key never reaches the
+  browser either way:
+  - `server/index.js` — a small Express server, for local dev (`npm run dev`)
+    and for any host that runs a persistent Node process (Render, Railway, a
+    VPS, etc. — start it with `npm start`).
+  - `netlify/functions/analyze.mts` — a Netlify Function at the same
+    `/api/analyze` path, for Netlify deploys (see below).
 - **Model:** Claude (vision) via `@anthropic-ai/sdk`
 
 ## Running it locally
@@ -61,24 +67,49 @@ server.
 | `ANTHROPIC_MODEL`    | `claude-sonnet-5` | Any current vision-capable Claude model |
 | `API_PORT`           | `8787`            | Port for the Express API server         |
 
-## Production build
+## Production build (self-hosted / Express)
 
 ```bash
 npm run build   # type-checks then builds the frontend to dist/
 npm start        # serves dist/ and the API from one Express process
 ```
 
+## Deploying to Netlify
+
+This repo is set up to deploy directly — `netlify.toml` points the build at
+`npm run build` / `dist`, and `netlify/functions/analyze.mts` serves the exact
+same `/api/analyze` path as a Netlify Function (no redirect rules needed —
+the function's in-code `config.path` handles that).
+
+1. Connect the repo in Netlify (or push to a repo already connected — it'll
+   auto-deploy on every push to `main`).
+2. In the Netlify UI: **Site settings → Environment variables**, add
+   `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`) with your own key.
+   Do this in Netlify's dashboard directly — never commit a real key to the
+   repo or paste it into chat with an assistant.
+3. Trigger a deploy (or just push — it happens automatically once the repo is
+   connected). No redeploy is required after only changing an environment
+   variable; Netlify Functions read it at invoke time.
+
+If you see a 404 on `/api/analyze` after deploying, it almost always means
+the deploy predates `netlify/functions/analyze.mts` being added, or the
+Netlify site's functions directory setting doesn't match `netlify.toml` — redeploy
+after confirming both are present.
+
 ## Project structure
 
 ```
-server/index.js          Express API — /api/analyze, calls the Claude API
-src/App.tsx               Wizard state machine (occasion → photos → details → review → results)
-src/components/           Step components (occasion picker, upload, details, review, loading, error)
-src/components/results/    Results dashboard (style profile, palette, silhouette, scores, beauty, dos/donts)
-src/lib/image.ts           Client-side photo downscaling to base64
-src/lib/api.ts             Fetch wrapper for /api/analyze
-src/data/occasions.ts      Occasion catalog and form option lists
-old-prototype/             An earlier, deliberately minimal single-file validation prototype, kept for reference
+shared/stylist.js          The system prompt + request/response logic, shared by both servers below
+server/index.js            Express API for local dev and self-hosting — POST /api/analyze
+netlify/functions/analyze.mts   Netlify Function serving the same /api/analyze path when deployed there
+netlify.toml                Netlify build + functions config
+src/App.tsx                 Wizard state machine (occasion → photos → details → review → results)
+src/components/             Step components (occasion picker, upload, details, review, loading, error)
+src/components/results/     Results dashboard (style profile, palette, silhouette, scores, beauty, dos/donts)
+src/lib/image.ts             Client-side photo downscaling to base64
+src/lib/api.ts               Fetch wrapper for /api/analyze
+src/data/occasions.ts        Occasion catalog and form option lists
+old-prototype/               An earlier, deliberately minimal single-file validation prototype, kept for reference
 ```
 
 ## Privacy
