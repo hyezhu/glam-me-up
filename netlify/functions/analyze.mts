@@ -10,7 +10,8 @@ export default async (req: Request) => {
     });
   }
 
-  const apiKey = Netlify.env.get("ANTHROPIC_API_KEY");
+  // Secret env vars are exposed via process.env but not always via Netlify.env
+  const apiKey = Netlify.env.get("ANTHROPIC_API_KEY") || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return new Response(
       JSON.stringify({
@@ -24,7 +25,7 @@ export default async (req: Request) => {
     const body = await req.json();
     const payload = validateAnalyzeBody(body);
     const anthropic = new Anthropic({ apiKey });
-    const model = Netlify.env.get("ANTHROPIC_MODEL") || "claude-sonnet-5";
+    const model = Netlify.env.get("ANTHROPIC_MODEL") || process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
     const parsed = await runStylistAnalysis(anthropic, model, payload);
     return new Response(JSON.stringify(parsed), {
       status: 200,
